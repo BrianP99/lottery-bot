@@ -1,0 +1,7 @@
+[build]
+  # No frontend: the site is a placeholder page plus Functions.
+  publish = "public"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "22"
