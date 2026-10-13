@@ -1,5 +1,5 @@
 import { generateLottoPicks, generatePensionPicks } from './analysis';
-import { drawInfoLine, lottoGamesBlock, pensionAllGroupsBlock, pensionOneGroupBlock } from './format';
+import { drawInfoLine, lottoGamesBlock, pensionAllGroupsBlock, pensionOneGroupBlock, pensionScoreLine, SCORE_NOTE } from './format';
 import { loadKnownLottoDraws, loadKnownPensionDraws, upcomingDraw } from './history';
 import { readIssued, saveIssued } from './picksStore';
 
@@ -42,7 +42,7 @@ async function pensionReply(group: number | null, now: Date): Promise<CommandRep
   const target = pensionDrawOnSale(now);
   const [history, issued] = await Promise.all([loadKnownPensionDraws(), readIssued('pension', target.drawNo)]);
   const salt = issued.requests + 1;
-  const { numbers } = generatePensionPicks(history, target.drawNo, 3, issued.numbers, salt);
+  const { numbers, stats } = generatePensionPicks(history, target.drawNo, 3, issued.numbers, salt);
   await saveIssued('pension', target.drawNo, { numbers: [...issued.numbers, ...numbers], requests: salt });
 
   return {
@@ -51,9 +51,10 @@ async function pensionReply(group: number | null, now: Date): Promise<CommandRep
         title: `🎫 연금복권720+ 제${target.drawNo}회 다른 추천번호`,
         description: `${drawInfoLine('pension', target.drawNo, target.date)}\n` + (group
           ? `${group}조만 새 번호로 사고, 나머지 조는 원래 번호로 사세요.\n${pensionOneGroupBlock(group, numbers)}`
-          : `모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(numbers)}`),
+          : `모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(numbers)}`) +
+          `\n1순위 자리별 점수: ${pensionScoreLine(numbers[0], stats.positionScores)}`,
         color: 0x22c55e,
-        footer: { text: '이번 회차에 이미 추천한 번호와 역대 당첨번호는 제외했습니다.' },
+        footer: { text: `이번 회차에 이미 추천한 번호와 역대 당첨번호는 제외했습니다. ${SCORE_NOTE}` },
       },
     ],
   };
@@ -63,15 +64,16 @@ async function lottoReply(now: Date): Promise<CommandReply> {
   const target = lottoDrawOnSale(now);
   const [history, issued] = await Promise.all([loadKnownLottoDraws(), readIssued('lotto', target.drawNo)]);
   const salt = issued.requests + 1;
-  const { games } = generateLottoPicks(history, target.drawNo, 5, salt);
-  await saveIssued('lotto', target.drawNo, { ...issued, requests: salt });
+  const { games, stats } = generateLottoPicks(history, target.drawNo, 5, salt, issued.numbers);
+  await saveIssued('lotto', target.drawNo, { numbers: [...issued.numbers, ...games.map((g) => g.join(','))], requests: salt });
 
   return {
     embeds: [
       {
         title: `🎱 로또 6/45 제${target.drawNo}회 새 추천번호`,
-        description: `${drawInfoLine('lotto', target.drawNo, target.date)}\n5게임 · 5,000원\n${lottoGamesBlock(games)}`,
+        description: `${drawInfoLine('lotto', target.drawNo, target.date)}\n5게임 · 5,000원 (숫자 아래는 번호별 점수)\n${lottoGamesBlock(games, stats.scores)}`,
         color: 0xfbbf24,
+        footer: { text: `이번 회차에 이미 추천한 게임과 역대 1등 조합은 제외했습니다. ${SCORE_NOTE}` },
       },
     ],
   };

@@ -12,7 +12,7 @@ export interface SavedPicks {
 }
 
 export interface IssuedNumbers {
-  /** Numbers handed out for this draw (연금 only; weekly picks included). */
+  /** Numbers handed out for this draw, weekly picks included (로또 games as "1,2,3,4,5,6"). */
   numbers: string[];
   /** How many times the command was used, to vary the next answer. */
   requests: number;
@@ -51,3 +51,29 @@ export async function readIssued(game: Game, drawNo: number): Promise<IssuedNumb
 }
 
 export const saveIssued = (game: Game, drawNo: number, issued: IssuedNumbers) => writeJson(`issued-${game}-${drawNo}`, issued);
+
+/** Running tally of how the Monday picks did, graded once per draw. */
+export interface PickRecord {
+  gradedLotto: number[]; // 로또 draws already counted
+  lottoGames: number;
+  lottoMatches: number; // numbers matched, summed over all games
+  lottoRanks: Record<string, number>; // '1'–'5' → count
+  gradedPension: number[];
+  pensionWeeks: number;
+  pensionWinWeeks: number; // weeks where any 조 won anything
+  pensionRanks: Record<string, number>; // '1등', '보너스', '7등' … → count (per 조 ticket)
+}
+
+const EMPTY_RECORD: PickRecord = {
+  gradedLotto: [],
+  lottoGames: 0,
+  lottoMatches: 0,
+  lottoRanks: {},
+  gradedPension: [],
+  pensionWeeks: 0,
+  pensionWinWeeks: 0,
+  pensionRanks: {},
+};
+
+export const readRecord = async (): Promise<PickRecord> => ({ ...EMPTY_RECORD, ...(await readJson<PickRecord>('record')) });
+export const saveRecord = (record: PickRecord) => writeJson('record', record);

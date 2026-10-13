@@ -3,10 +3,25 @@
 
 export const PENSION_GROUPS = [1, 2, 3, 4, 5];
 
-export function lottoGamesBlock(games: number[][]): string {
-  const lines = games.map((g, i) => `${String.fromCharCode(65 + i)}  ${g.map((n) => String(n).padStart(2, ' ')).join('  ')}`);
+/** Each game, with every number's score on the line below it when `scores` is given. */
+export function lottoGamesBlock(games: number[][], scores?: number[]): string {
+  // Five-character columns so a number and its score ("1.21") line up.
+  const lines = games.flatMap((g, i) => {
+    const game = `${String.fromCharCode(65 + i)}${g.map((n) => String(n).padStart(5)).join('')}`;
+    return scores ? [game, ` ${g.map((n) => scores[n].toFixed(2).padStart(5)).join('')}`] : [game];
+  });
   return `\`\`\`\n${lines.join('\n')}\n\`\`\``;
 }
+
+/** e.g. "4(1.12) 6(0.98) 1(1.05) …" — each digit of `number` with its position score. */
+export function pensionScoreLine(number: string, positionScores: number[][]): string {
+  return number
+    .split('')
+    .map((d, pos) => `${d}(${positionScores[pos][Number(d)].toFixed(2)})`)
+    .join(' ');
+}
+
+export const SCORE_NOTE = '점수 = 역대 빈도 50% + 최근 52회 빈도 30% + 미출현 기간 20% (1.00이 평균)';
 
 const spaced = (number: string) => number.split('').join(' ');
 
