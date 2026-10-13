@@ -94,3 +94,11 @@ test('Discord signature verification', () => {
   assert.equal(verifyDiscordRequest(rawPublicKey, signature, timestamp, body + ' '), false);
   assert.equal(verifyDiscordRequest(rawPublicKey, 'zz', timestamp, body), false);
 });
+
+test('draw info line shows 회차, date, draw time and sales close', async () => {
+  const { drawInfoLine } = await import('../src/lottery/format');
+  assert.equal(drawInfoLine('lotto', 1246, '2026-10-17'), '**제1246회** · 10월 17일(토) 20:35 추첨 · 구매 마감 당일 20:00');
+  assert.equal(drawInfoLine('pension', 337, '2026-10-15'), '**제337회** · 10월 15일(목) 19:05 추첨 · 구매 마감 당일 17:00');
+  const reply = (await runCommand('로또', [], new Date('2026-10-13T01:00:00Z'))) as any;
+  assert.match(reply.embeds[0].description, /^\*\*제1246회\*\* · 10월 17일\(토\)/);
+});

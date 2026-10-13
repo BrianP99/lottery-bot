@@ -1,5 +1,5 @@
 import { generateLottoPicks, generatePensionPicks } from './analysis';
-import { lottoGamesBlock, pensionAllGroupsBlock, pensionOneGroupBlock } from './format';
+import { drawInfoLine, lottoGamesBlock, pensionAllGroupsBlock, pensionOneGroupBlock } from './format';
 import { loadKnownLottoDraws, loadKnownPensionDraws, upcomingDraw } from './history';
 import { readIssued, saveIssued } from './picksStore';
 
@@ -49,9 +49,9 @@ async function pensionReply(group: number | null, now: Date): Promise<CommandRep
     embeds: [
       {
         title: `🎫 연금복권720+ 제${target.drawNo}회 다른 추천번호`,
-        description: group
+        description: `${drawInfoLine('pension', target.drawNo, target.date)}\n` + (group
           ? `${group}조만 새 번호로 사고, 나머지 조는 원래 번호로 사세요.\n${pensionOneGroupBlock(group, numbers)}`
-          : `모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(numbers)}`,
+          : `모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(numbers)}`),
         color: 0x22c55e,
         footer: { text: '이번 회차에 이미 추천한 번호와 역대 당첨번호는 제외했습니다.' },
       },
@@ -70,7 +70,7 @@ async function lottoReply(now: Date): Promise<CommandReply> {
     embeds: [
       {
         title: `🎱 로또 6/45 제${target.drawNo}회 새 추천번호`,
-        description: `5게임 · 5,000원\n${lottoGamesBlock(games)}`,
+        description: `${drawInfoLine('lotto', target.drawNo, target.date)}\n5게임 · 5,000원\n${lottoGamesBlock(games)}`,
         color: 0xfbbf24,
       },
     ],

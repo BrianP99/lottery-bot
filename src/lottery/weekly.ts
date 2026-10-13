@@ -1,7 +1,7 @@
 import { postToDiscord, type DiscordNotifyResult } from '../discord';
 import { generateLottoPicks, generatePensionPicks, lottoRank, pensionRank, type LottoPicks, type PensionPicks } from './analysis';
 import { loadLottoHistory, loadPensionHistory, upcomingDraw } from './history';
-import { lottoGamesBlock, pensionAllGroupsBlock, PENSION_GROUPS, SOLD_OUT_HINT } from './format';
+import { drawInfoLine, lottoGamesBlock, pensionAllGroupsBlock, PENSION_GROUPS, SOLD_OUT_HINT } from './format';
 import { readIssued, readWeeklyPicks, saveIssued, saveWeeklyPicks, type SavedPicks } from './picksStore';
 import type { LottoDraw, PensionDraw } from './dhlottery';
 
@@ -74,8 +74,8 @@ export async function buildWeeklyLottery(now = new Date()): Promise<WeeklyLotter
 
   const embeds = [
     {
-      title: `🎱 로또 6/45 제${lottoTarget.drawNo}회 (${lottoTarget.date} 토 추첨)`,
-      description: `5게임 · 5,000원\n${lottoGamesBlock(lotto.games)}`,
+      title: `🎱 로또 6/45 제${lottoTarget.drawNo}회 추천번호`,
+      description: `${drawInfoLine('lotto', lottoTarget.drawNo, lottoTarget.date)}\n5게임 · 5,000원\n${lottoGamesBlock(lotto.games)}`,
       color: 0xfbbf24,
       fields: [
         { name: `최근 52회 자주 나온 번호`, value: ls.hotRecent.join(', '), inline: true },
@@ -89,8 +89,8 @@ export async function buildWeeklyLottery(now = new Date()): Promise<WeeklyLotter
       ],
     },
     {
-      title: `🎫 연금복권720+ 제${pensionTarget.drawNo}회 (${pensionTarget.date} 목 추첨)`,
-      description: `모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(pension.numbers)}\n${SOLD_OUT_HINT}`,
+      title: `🎫 연금복권720+ 제${pensionTarget.drawNo}회 추천번호`,
+      description: `${drawInfoLine('pension', pensionTarget.drawNo, pensionTarget.date)}\n모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(pension.numbers)}\n${SOLD_OUT_HINT}`,
       color: 0x22c55e,
       fields: [
         { name: '자리별 역대 최다 숫자', value: pension.stats.topDigitByPosition.join(' '), inline: true },

@@ -23,3 +23,17 @@ export function pensionOneGroupBlock(group: number, numbers: string[]): string {
 }
 
 export const SOLD_OUT_HINT = '이미 팔린 번호면 디스코드에서 `/연금`(전체 새 번호) 또는 `/연금 조:3`(그 조만 새 번호)을 입력하세요.';
+
+// Draw and sales-close times (KST), per 동행복권: 로또 is drawn Saturday 20:35
+// with sales closing 20:00; 연금 Thursday 19:05, closing 17:00.
+const SCHEDULE = {
+  lotto: { weekday: '토', drawTime: '20:35', salesClose: '20:00' },
+  pension: { weekday: '목', drawTime: '19:05', salesClose: '17:00' },
+} as const;
+
+/** e.g. "**제1246회** · 10월 17일(토) 20:35 추첨 · 구매 마감 당일 20:00" */
+export function drawInfoLine(game: 'lotto' | 'pension', drawNo: number, isoDate: string): string {
+  const [, month, day] = isoDate.split('-').map(Number);
+  const s = SCHEDULE[game];
+  return `**제${drawNo}회** · ${month}월 ${day}일(${s.weekday}) ${s.drawTime} 추첨 · 구매 마감 당일 ${s.salesClose}`;
+}
