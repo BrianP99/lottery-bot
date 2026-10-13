@@ -94,3 +94,49 @@ test('Discord signature verification', () => {
   assert.equal(verifyDiscordRequest(rawPublicKey, signature, timestamp, body + ' '), false);
   assert.equal(verifyDiscordRequest(rawPublicKey, 'zz', timestamp, body), false);
 });
+
+test('draw info line shows 회차, date, draw time and sales close', async () => {
+  const { drawInfoLine } = await import('../src/lottery/format');
+  assert.equal(drawInfoLine('lotto', 1246, '2026-10-17'), '**제1246회** · 10월 17일(토) 20:35 추첨 · 구매 마감 당일 20:00');
+  assert.equal(drawInfoLine('pension', 337, '2026-10-15'), '**제337회** · 10월 15일(목) 19:05 추첨 · 구매 마감 당일 17:00');
+  const reply = (await runCommand('로또', [], new Date('2026-10-13T01:00:00Z'))) as any;
+  assert.match(reply.embeds[0].description, /^\*\*제1246회\*\* · 10월 17일\(토\)/);
+});
+
+test('로또 picks never repeat an excluded game', () => {
+  const first = generateLottoPicks(lotto, 1246, 5, 1);
+  const again = generateLottoPicks(lotto, 1246, 5, 1, first.games.map((g) => g.join(',')));
+  const seen = new Set(first.games.map((g) => g.join(',')));
+  assert.ok(again.games.every((g) => !seen.has(g.join(','))));
+  assert.equal(again.games.length, 5);
+});
+
+test('scores line up under each number', async () => {
+  const { lottoGamesBlock } = await import('../src/lottery/format');
+  const scores = Array.from({ length: 46 }, (_, n) => n / 10);
+  const lines = lottoGamesBlock([[1, 2, 3, 40, 44, 45]], scores).split('\n');
+  assert.equal(lines[1], 'A    1    2    3   40   44   45');
+  assert.equal(lines[2], '  0.10 0.20 0.30 4.00 4.40 4.50');
+});
+
+test('record counts each draw once and tallies results', async () => {
+  const { gradeLastWeek, recordSummary } = await import('../src/lottery/record');
+  const empty = { gradedLotto: [], lottoGames: 0, lottoMatches: 0, lottoRanks: {}, gradedPension: [], pensionWeeks: 0, pensionWinWeeks: 0, pensionRanks: {} };
+  const lottoDraw = { drawNo: 10, date: '', numbers: [1, 2, 3, 4, 5, 6], bonus: 7 };
+  const pensionDraw = { drawNo: 3, date: '', group: 2, number: '123456', bonus: '999999' };
+  const saved = {
+    lotto: { drawNo: 10, games: [[1, 2, 3, 10, 11, 12], [20, 21, 22, 23, 24, 25]] },
+    pension: { drawNo: 3, numbers: ['000056'] },
+  };
+  const once = gradeLastWeek(saved, [lottoDraw], [pensionDraw], empty);
+  assert.equal(once.record.lottoGames, 2);
+  assert.equal(once.record.lottoMatches, 3);
+  assert.deepEqual(once.record.lottoRanks, { 5: 1 });
+  assert.equal(once.record.pensionWeeks, 1);
+  assert.equal(once.record.pensionWinWeeks, 1);
+  assert.deepEqual(once.record.pensionRanks, { '6등': 5 }); // 끝 2자리, all five 조
+  const twice = gradeLastWeek(saved, [lottoDraw], [pensionDraw], once.record);
+  assert.deepEqual(twice.record, once.record);
+  assert.match(recordSummary(once.record)!, /게임당 평균 1\.50개 적중 \(무작위 0\.80\) · 당첨 5등 1회/);
+  assert.equal(recordSummary(empty), null);
+});

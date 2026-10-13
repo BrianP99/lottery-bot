@@ -59,7 +59,9 @@ function blendWeights(allTime: number[], recent: number[], gap: number[]): numbe
 export interface LottoStats {
   drawCount: number;
   latestDrawNo: number;
-  hotRecent: number[]; // most frequent over the last RECENT_WINDOW draws
+  /** Each number's score (index = number, 0 unused); 1.00 is average. */
+  scores: number[];
+  topScores: { number: number; score: number }[];
   coldOverdue: { number: number; gap: number }[]; // longest since last drawn
   sumRange: [number, number]; // middle 80% of historical sums
   filterPassRate: number; // share of past winning combos that pass every filter
@@ -87,8 +89,18 @@ function lottoShapeOk(nums: number[], sumRange: [number, number]): boolean {
   return sum >= sumRange[0] && sum <= sumRange[1] && odd >= 2 && odd <= 4 && low >= 2 && low <= 4 && maxRun(nums) <= 2;
 }
 
-/** `salt` 0 is the weekly pick; each later request for the same draw passes a new salt for fresh games. */
-export function generateLottoPicks(history: LottoDraw[], targetDrawNo: number, gameCount = 5, salt = 0): LottoPicks {
+/**
+ * `salt` 0 is the weekly pick; each later request for the same draw passes a
+ * new salt for fresh games. `exclude` holds games ("1,2,3,4,5,6") already
+ * handed out for this draw, so they're never repeated.
+ */
+export function generateLottoPicks(
+  history: LottoDraw[],
+  targetDrawNo: number,
+  gameCount = 5,
+  salt = 0,
+  exclude: Iterable<string> = [],
+): LottoPicks {
   const recent = history.slice(-RECENT_WINDOW);
   const allTime = new Array(46).fill(0);
   const recentFreq = new Array(46).fill(0);
@@ -106,7 +118,7 @@ export function generateLottoPicks(history: LottoDraw[], targetDrawNo: number, g
 
   const sums = history.map((d) => d.numbers.reduce((a, b) => a + b, 0)).sort((a, b) => a - b);
   const sumRange: [number, number] = [percentile(sums, 0.1), percentile(sums, 0.9)];
-  const pastCombos = new Set(history.map((d) => d.numbers.join(',')));
+  const skip = new Set([...history.map((d) => d.numbers.join(',')), ...exclude]);
 
   const rand = mulberry32(targetDrawNo * 7919 + 645 + salt * 104729);
   const games: number[][] = [];
@@ -116,20 +128,23 @@ export function generateLottoPicks(history: LottoDraw[], targetDrawNo: number, g
     picked.delete(0);
     const nums = [...picked].sort((a, b) => a - b);
     if (!lottoShapeOk(nums, sumRange)) continue;
-    if (pastCombos.has(nums.join(','))) continue;
+    if (skip.has(nums.join(','))) continue;
     // Spread the five games out instead of betting on the same few numbers.
     if (games.some((g) => g.filter((n) => nums.includes(n)).length > 2)) continue;
     games.push(nums);
   }
 
-  const byCount = (a: number, b: number) => recentFreq[b] - recentFreq[a] || a - b;
   const numbers = Array.from({ length: 45 }, (_, i) => i + 1);
   return {
     games,
     stats: {
       drawCount: history.length,
       latestDrawNo,
-      hotRecent: numbers.slice().sort(byCount).slice(0, 6).sort((a, b) => a - b),
+      scores: weights,
+      topScores: numbers
+        .map((n) => ({ number: n, score: weights[n] }))
+        .sort((a, b) => b.score - a.score || a.number - b.number)
+        .slice(0, 6),
       coldOverdue: numbers
         .map((n) => ({ number: n, gap: gap[n] }))
         .sort((a, b) => b.gap - a.gap || a.number - b.number)
@@ -156,6 +171,8 @@ export interface PensionStats {
   drawCount: number;
   latestDrawNo: number;
   topDigitByPosition: number[]; // most frequent digit per position, all-time
+  /** Score of each digit 0–9 at each of the six positions; 1.00 is average. */
+  positionScores: number[][];
   groupCounts: number[]; // 1등 조 frequency, index 1–5
 }
 
@@ -215,7 +232,10 @@ export function generatePensionPicks(
 
   const groupCounts = new Array(6).fill(0);
   for (const d of history) groupCounts[d.group]++;
-  return { numbers, stats: { drawCount: history.length, latestDrawNo, topDigitByPosition, groupCounts } };
+  return {
+    numbers,
+    stats: { drawCount: history.length, latestDrawNo, topDigitByPosition, positionScores: positionWeights, groupCounts },
+  };
 }
 
 /**
