@@ -42,8 +42,9 @@ export async function buildWeeklyLottery(now = new Date()): Promise<WeeklyLotter
   const lottoTarget = upcomingDraw('lotto', now);
   const pensionTarget = upcomingDraw('pension', now);
 
-  const lotto = generateLottoPicks(lottoHistory.draws, lottoTarget.drawNo, LOTTO_GAMES);
-  const pension = generatePensionPicks(pensionHistory.draws, pensionTarget.drawNo, PENSION_CANDIDATES);
+  // The top of the ranking; /로또 and /연금 continue from where this leaves off.
+  const lotto = generateLottoPicks(lottoHistory.draws, LOTTO_GAMES);
+  const pension = generatePensionPicks(pensionHistory.draws, PENSION_CANDIDATES);
 
   // If the history is behind, say so: the picks are still valid, but the analysis is missing recent draws.
   const warnings: string[] = [];
@@ -62,7 +63,7 @@ export async function buildWeeklyLottery(now = new Date()): Promise<WeeklyLotter
 
   const embeds = [
     {
-      title: `🎱 로또 6/45 제${lottoTarget.drawNo}회 추천번호`,
+      title: `🎱 로또 6/45 제${lottoTarget.drawNo}회 추천번호 (점수 1~5위)`,
       description: `${drawInfoLine('lotto', lottoTarget.drawNo, lottoTarget.date)}\n5게임 · 5,000원 (숫자 아래는 번호별 점수)\n${lottoGamesBlock(lotto.games, ls.scores)}`,
       color: 0xfbbf24,
       fields: [
@@ -77,7 +78,7 @@ export async function buildWeeklyLottery(now = new Date()): Promise<WeeklyLotter
       ],
     },
     {
-      title: `🎫 연금복권720+ 제${pensionTarget.drawNo}회 추천번호`,
+      title: `🎫 연금복권720+ 제${pensionTarget.drawNo}회 추천번호 (점수 1~3위)`,
       description: `${drawInfoLine('pension', pensionTarget.drawNo, pensionTarget.date)}\n모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(pension.numbers)}\n${SOLD_OUT_HINT}`,
       color: 0x22c55e,
       fields: [
@@ -101,7 +102,7 @@ export async function buildWeeklyLottery(now = new Date()): Promise<WeeklyLotter
       : []),
     {
       description:
-        `※ ${SCORE_NOTE}. 추첨은 매회 독립적인 무작위라 점수로 당첨 확률이 오르지는 않습니다.` +
+        `※ ${SCORE_NOTE}. 이번 주 점수가 가장 높은 조합이며, 명령어는 그다음 순위부터 줍니다. 추첨은 매회 독립적인 무작위라 점수로 당첨 확률이 오르지는 않습니다.` +
         (warnings.length ? `\n⚠️ ${warnings.join('\n⚠️ ')}` : ''),
       color: 0x9ca3af,
       timestamp: now.toISOString(),
