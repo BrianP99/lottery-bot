@@ -1,7 +1,7 @@
 import type { Config } from '@netlify/functions';
 import { runWeeklyLottery } from '../../src/lottery/weekly';
 
-// Every Monday 08:00 KST: this week's 로또 (Sat) and 연금복권720+ (Thu) picks,
+// Every Monday 09:00 KST: this week's 로또 (Sat) and 연금복권720+ (Thu) picks,
 // plus how last week's picks did, posted to Discord.
 export default async () => {
   try {
@@ -14,6 +14,6 @@ export default async () => {
 };
 
 export const config: Config = {
-  // Netlify cron runs in UTC: Sunday 23:00 UTC = Monday 08:00 KST.
-  schedule: '0 23 * * 0',
+  // Netlify cron runs in UTC: Monday 00:00 UTC = Monday 09:00 KST.
+  schedule: '0 0 * * 1',
 };

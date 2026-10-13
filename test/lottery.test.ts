@@ -15,7 +15,7 @@ const lotto = lottoSeed as LottoDraw[];
 const pension = pensionSeed as PensionDraw[];
 
 test('upcoming draw numbers and dates', () => {
-  const monday = new Date('2026-10-04T23:00:00Z'); // 2026-10-05 08:00 KST
+  const monday = new Date('2026-10-05T00:00:00Z'); // 2026-10-05 09:00 KST
   assert.deepEqual(upcomingDraw('lotto', monday), { drawNo: 1245, date: '2026-10-10' });
   assert.deepEqual(upcomingDraw('pension', monday), { drawNo: 336, date: '2026-10-08' });
   assert.equal(upcomingDraw('lotto', new Date('2026-10-03T01:00:00Z')).drawNo, 1244); // draw day itself
