@@ -1,39 +1,14 @@
 import type { LottoDraw, PensionDraw } from './dhlottery';
 
 // Every draw is independent and uniformly random, so no amount of history
-// changes the odds of any combination. What history *can* do is steer away
-// from picks that are common among other buyers (birthdays, runs, patterns)
-// and toward shapes that winning combinations usually have — which doesn't
-// raise the chance of winning, but avoids splitting a prize if it happens.
-// The weighting below is for flavour; the filters are the meaningful part.
+// changes the odds of any combination; a backtest over 1044 draws found no
+// weighting that beats chance. The scores are a data-based ranking to pick
+// from, not a prediction: picks are handed out from the highest total score
+// down, and the running record in record.ts shows how they fare.
 
 const RECENT_WINDOW = 52; // ≈ one year of weekly draws
-
-/** Small seeded PRNG so re-running for the same draw returns the same picks. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function weightedPick(weights: number[], rand: () => number, exclude: Set<number> = new Set()): number {
-  let total = 0;
-  for (let i = 0; i < weights.length; i++) if (!exclude.has(i)) total += weights[i];
-  let r = rand() * total;
-  for (let i = 0; i < weights.length; i++) {
-    if (exclude.has(i)) continue;
-    r -= weights[i];
-    if (r <= 0) return i;
-  }
-  // Floating-point leftovers: fall back to the last eligible index.
-  for (let i = weights.length - 1; i >= 0; i--) if (!exclude.has(i)) return i;
-  throw new Error('no eligible index');
-}
+const LOTTO_POOL = 22; // games are built from the highest-scoring numbers
+const PENSION_DIGITS_PER_POSITION = 5;
 
 function mean(xs: number[]): number {
   return xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -90,17 +65,12 @@ function lottoShapeOk(nums: number[], sumRange: [number, number]): boolean {
 }
 
 /**
- * `salt` 0 is the weekly pick; each later request for the same draw passes a
- * new salt for fresh games. `exclude` holds games ("1,2,3,4,5,6") already
- * handed out for this draw, so they're never repeated.
+ * The highest-scoring games that pass every filter, best first. `exclude`
+ * holds games ("1,2,3,4,5,6") already handed out for this draw, so each
+ * request continues down the ranking: the Monday picks are the top set, the
+ * first /로또 the next one, and so on.
  */
-export function generateLottoPicks(
-  history: LottoDraw[],
-  targetDrawNo: number,
-  gameCount = 5,
-  salt = 0,
-  exclude: Iterable<string> = [],
-): LottoPicks {
+export function generateLottoPicks(history: LottoDraw[], gameCount = 5, exclude: Iterable<string> = []): LottoPicks {
   const recent = history.slice(-RECENT_WINDOW);
   const allTime = new Array(46).fill(0);
   const recentFreq = new Array(46).fill(0);
@@ -120,21 +90,37 @@ export function generateLottoPicks(
   const sumRange: [number, number] = [percentile(sums, 0.1), percentile(sums, 0.9)];
   const skip = new Set([...history.map((d) => d.numbers.join(',')), ...exclude]);
 
-  const rand = mulberry32(targetDrawNo * 7919 + 645 + salt * 104729);
+  const numbers = Array.from({ length: 45 }, (_, i) => i + 1);
+  const pool = numbers
+    .slice()
+    .sort((a, b) => weights[b] - weights[a] || a - b)
+    .slice(0, LOTTO_POOL)
+    .sort((a, b) => a - b);
+  const ranked: { total: number; nums: number[] }[] = [];
+  const pick: number[] = [];
+  (function choose(start: number) {
+    if (pick.length === 6) {
+      if (lottoShapeOk(pick, sumRange) && !skip.has(pick.join(','))) {
+        ranked.push({ total: pick.reduce((t, n) => t + weights[n], 0), nums: [...pick] });
+      }
+      return;
+    }
+    for (let i = start; i < pool.length; i++) {
+      pick.push(pool[i]);
+      choose(i + 1);
+      pick.pop();
+    }
+  })(0);
+  ranked.sort((a, b) => b.total - a.total || a.nums.join(',').localeCompare(b.nums.join(',')));
+
   const games: number[][] = [];
-  for (let attempt = 0; games.length < gameCount && attempt < 20000; attempt++) {
-    const picked = new Set<number>([0]);
-    while (picked.size < 7) picked.add(weightedPick(weights, rand, picked));
-    picked.delete(0);
-    const nums = [...picked].sort((a, b) => a - b);
-    if (!lottoShapeOk(nums, sumRange)) continue;
-    if (skip.has(nums.join(','))) continue;
-    // Spread the five games out instead of betting on the same few numbers.
+  for (const { nums } of ranked) {
+    // Within one set, spread the games out instead of five near-copies of the top game.
     if (games.some((g) => g.filter((n) => nums.includes(n)).length > 2)) continue;
     games.push(nums);
+    if (games.length === gameCount) break;
   }
 
-  const numbers = Array.from({ length: 45 }, (_, i) => i + 1);
   return {
     games,
     stats: {
@@ -187,16 +173,10 @@ export interface PensionPicks {
 }
 
 /**
- * `exclude` holds numbers already handed out for this draw, so asking again
- * never repeats one; `salt` varies the sequence between requests.
+ * The highest-scoring numbers, best first. `exclude` holds numbers already
+ * handed out for this draw, so asking again continues down the ranking.
  */
-export function generatePensionPicks(
-  history: PensionDraw[],
-  targetDrawNo: number,
-  count = 3,
-  exclude: Iterable<string> = [],
-  salt = 0,
-): PensionPicks {
+export function generatePensionPicks(history: PensionDraw[], count = 3, exclude: Iterable<string> = []): PensionPicks {
   // Each of the six positions is drawn separately (0–9), so analyse them separately.
   const recent = history.slice(-RECENT_WINDOW);
   const latestDrawNo = history.at(-1)!.drawNo;
@@ -217,17 +197,28 @@ export function generatePensionPicks(
   }
 
   const skip = new Set([...history.flatMap((d) => [d.number, d.bonus]), ...exclude]);
-  const rand = mulberry32(targetDrawNo * 7919 + 720 + salt * 104729);
+  // Every number built from each position's top digits, ranked by total score.
+  const topDigits = positionWeights.map((w) =>
+    w
+      .map((score, digit) => ({ score, digit }))
+      .sort((a, b) => b.score - a.score || a.digit - b.digit)
+      .slice(0, PENSION_DIGITS_PER_POSITION),
+  );
+  let ranked: { total: number; number: string }[] = [{ total: 0, number: '' }];
+  for (const options of topDigits) {
+    ranked = ranked.flatMap((r) => options.map((o) => ({ total: r.total + o.score, number: r.number + o.digit })));
+  }
+  ranked.sort((a, b) => b.total - a.total || a.number.localeCompare(b.number));
+
   const numbers: string[] = [];
-  for (let attempt = 0; numbers.length < count && attempt < 10000; attempt++) {
-    const number = positionWeights.map((w) => weightedPick(w, rand)).join('');
+  for (const { number } of ranked) {
     // Skip numbers people favour (mostly one digit), ones that already came up,
     // and ones already handed out.
     if (new Set(number).size < 3 || skip.has(number)) continue;
     // Backups should differ in the last digits, which decide 3등–7등.
     if (numbers.some((n) => n.slice(-3) === number.slice(-3))) continue;
-    skip.add(number);
     numbers.push(number);
+    if (numbers.length === count) break;
   }
 
   const groupCounts = new Array(6).fill(0);

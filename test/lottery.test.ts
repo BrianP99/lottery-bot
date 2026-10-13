@@ -54,23 +54,41 @@ test('parses the official JSON rows', () => {
   );
 });
 
-test('로또 picks: five valid, deterministic games; a new salt gives new games', () => {
-  const a = generateLottoPicks(lotto, 1245);
-  assert.deepEqual(a.games, generateLottoPicks(lotto, 1245).games);
+test('로또 picks: five valid games, highest total score first', () => {
+  const a = generateLottoPicks(lotto);
+  assert.deepEqual(a.games, generateLottoPicks(lotto).games);
   assert.equal(a.games.length, 5);
   for (const g of a.games) {
     assert.equal(new Set(g).size, 6);
     assert.ok(g.every((n) => n >= 1 && n <= 45));
   }
-  assert.notDeepEqual(a.games, generateLottoPicks(lotto, 1245, 5, 1).games);
+  const total = (g: number[]) => g.reduce((t, n) => t + a.stats.scores[n], 0);
+  for (let i = 1; i < 5; i++) assert.ok(total(a.games[i - 1]) >= total(a.games[i]));
+  // No random combination passing the same filters beats the top game.
+  const top = total(a.games[0]);
+  const { sumRange } = a.stats;
+  for (let t = 0; t < 20000; t++) {
+    const s = new Set<number>();
+    while (s.size < 6) s.add(1 + Math.floor(Math.random() * 45));
+    const g = [...s].sort((x, y) => x - y);
+    const sum = g.reduce((x, y) => x + y, 0);
+    const odd = g.filter((n) => n % 2).length;
+    const low = g.filter((n) => n <= 22).length;
+    const run = g.some((n, i) => i >= 2 && g[i - 1] === n - 1 && g[i - 2] === n - 2);
+    if (sum < sumRange[0] || sum > sumRange[1] || odd < 2 || odd > 4 || low < 2 || low > 4 || run) continue;
+    assert.ok(total(g) <= top + 1e-9, `${g} beats the top game`);
+  }
 });
 
-test('연금 picks: distinct candidates, never one already handed out', () => {
-  const a = generatePensionPicks(pension, 336, 3);
+test('연금 picks: highest score first, never one already handed out', () => {
+  const a = generatePensionPicks(pension, 3);
   assert.equal(new Set(a.numbers).size, 3);
   assert.ok(a.numbers.every((n) => /^\d{6}$/.test(n)));
-  const b = generatePensionPicks(pension, 336, 3, a.numbers, 1);
+  const score = (n: string) => n.split('').reduce((t, d, pos) => t + a.stats.positionScores[pos][Number(d)], 0);
+  assert.ok(score(a.numbers[0]) >= score(a.numbers[1]) && score(a.numbers[1]) >= score(a.numbers[2]));
+  const b = generatePensionPicks(pension, 3, a.numbers);
   assert.ok(b.numbers.every((n) => !a.numbers.includes(n)));
+  assert.ok(score(b.numbers[0]) <= score(a.numbers[0]));
 });
 
 test('commands roll over to the next draw once sales close', async () => {
@@ -104,8 +122,8 @@ test('draw info line shows 회차, date, draw time and sales close', async () =>
 });
 
 test('로또 picks never repeat an excluded game', () => {
-  const first = generateLottoPicks(lotto, 1246, 5, 1);
-  const again = generateLottoPicks(lotto, 1246, 5, 1, first.games.map((g) => g.join(',')));
+  const first = generateLottoPicks(lotto);
+  const again = generateLottoPicks(lotto, 5, first.games.map((g) => g.join(',')));
   const seen = new Set(first.games.map((g) => g.join(',')));
   assert.ok(again.games.every((g) => !seen.has(g.join(','))));
   assert.equal(again.games.length, 5);
