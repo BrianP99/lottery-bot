@@ -93,12 +93,12 @@ test('연금 picks: highest score first, never one already handed out', () => {
 
 test('commands roll over to the next draw once sales close', async () => {
   const title = async (name: string, at: string) => ((await runCommand(name, [], new Date(at))) as any).embeds[0].title as string;
-  assert.match(await title('연금', '2026-10-08T01:00:00Z'), /제336회/); // 목 10:00 KST
-  assert.match(await title('연금', '2026-10-08T09:00:00Z'), /제337회/); // 목 18:00 KST
-  assert.match(await title('로또', '2026-10-10T10:00:00Z'), /제1245회/); // 토 19:00 KST
-  assert.match(await title('로또', '2026-10-10T12:00:00Z'), /제1246회/); // 토 21:00 KST
+  assert.match(await title('연금', '2026-10-08T01:00:00Z'), / 336회/); // 목 10:00 KST
+  assert.match(await title('연금', '2026-10-08T09:00:00Z'), / 337회/); // 목 18:00 KST
+  assert.match(await title('로또', '2026-10-10T10:00:00Z'), / 1245회/); // 토 19:00 KST
+  assert.match(await title('로또', '2026-10-10T12:00:00Z'), / 1246회/); // 토 21:00 KST
   const oneGroup = (await runCommand('연금', [{ name: '조', value: 3 }])) as any;
-  assert.match(oneGroup.embeds[0].description, /3조만 새 번호로/);
+  assert.match(oneGroup.embeds[0].description, /3조만 이 번호로/);
   assert.ok(COMMAND_DEFINITIONS.every((c) => c.description.length <= 100));
 });
 
@@ -113,12 +113,13 @@ test('Discord signature verification', () => {
   assert.equal(verifyDiscordRequest(rawPublicKey, 'zz', timestamp, body), false);
 });
 
-test('draw info line shows 회차, date, draw time and sales close', async () => {
-  const { drawInfoLine } = await import('../src/lottery/format');
-  assert.equal(drawInfoLine('lotto', 1246, '2026-10-17'), '**제1246회** · 10월 17일(토) 20:35 추첨 · 구매 마감 당일 20:00');
-  assert.equal(drawInfoLine('pension', 337, '2026-10-15'), '**제337회** · 10월 15일(목) 19:05 추첨 · 구매 마감 당일 17:00');
+test('schedule line shows the draw date, time and sales close', async () => {
+  const { scheduleLine } = await import('../src/lottery/format');
+  assert.equal(scheduleLine('lotto', '2026-10-17'), '📅 10월 17일(토) 20:35 추첨 · ⏰ 구매 마감 20:00');
+  assert.equal(scheduleLine('pension', '2026-10-15'), '📅 10월 15일(목) 19:05 추첨 · ⏰ 구매 마감 17:00');
   const reply = (await runCommand('로또', [], new Date('2026-10-13T01:00:00Z'))) as any;
-  assert.match(reply.embeds[0].description, /^\*\*제1246회\*\* · 10월 17일\(토\)/);
+  assert.match(reply.embeds[0].title, /로또 6\/45 · 1246회/);
+  assert.match(reply.embeds[0].description, /^📅 10월 17일\(토\)/);
 });
 
 test('로또 picks never repeat an excluded game', () => {
@@ -129,12 +130,16 @@ test('로또 picks never repeat an excluded game', () => {
   assert.equal(again.games.length, 5);
 });
 
-test('scores line up under each number', async () => {
-  const { lottoGamesBlock } = await import('../src/lottery/format');
+test('number blocks keep columns aligned with the average score at the end', async () => {
+  const { lottoGamesBlock, pensionBlock } = await import('../src/lottery/format');
   const scores = Array.from({ length: 46 }, (_, n) => n / 10);
-  const lines = lottoGamesBlock([[1, 2, 3, 40, 44, 45]], scores).split('\n');
-  assert.equal(lines[1], 'A    1    2    3   40   44   45');
-  assert.equal(lines[2], '  0.10 0.20 0.30 4.00 4.40 4.50');
+  const lotto = lottoGamesBlock([[1, 2, 3, 40, 44, 45], [10, 11, 12, 13, 14, 15]], scores).split('\n');
+  assert.equal(lotto[1], 'A │  1  2  3 40 44 45 │ 2.25');
+  assert.equal(lotto[2], 'B │ 10 11 12 13 14 15 │ 1.25');
+  const positionScores = Array.from({ length: 6 }, () => Array.from({ length: 10 }, (_, d) => d / 10));
+  const pension = pensionBlock(['123456', '000000'], ['모든조 (1~5조)'], positionScores).split('\n');
+  assert.equal(pension[1], '1 2 3 4 5 6 │ 0.35  모든조 (1~5조)');
+  assert.equal(pension[2], '0 0 0 0 0 0 │ 0.00');
 });
 
 test('record counts each draw once and tallies results', async () => {
@@ -155,6 +160,6 @@ test('record counts each draw once and tallies results', async () => {
   assert.deepEqual(once.record.pensionRanks, { '6등': 5 }); // 끝 2자리, all five 조
   const twice = gradeLastWeek(saved, [lottoDraw], [pensionDraw], once.record);
   assert.deepEqual(twice.record, once.record);
-  assert.match(recordSummary(once.record)!, /게임당 평균 1\.50개 적중 \(무작위 0\.80\) · 당첨 5등 1회/);
+  assert.match(recordSummary(once.record)!, /게임당 평균 \*\*1\.50개\*\* 맞음 \(무작위 0\.80\) · 당첨 5등 1회/);
   assert.equal(recordSummary(empty), null);
 });
