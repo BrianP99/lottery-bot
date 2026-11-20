@@ -28,7 +28,8 @@
 |---|---|
 | `lottery-weekly-scheduled` | 월요일 09:00 KST(월요일 00:00 UTC)에 자동 실행 |
 | `GET /api/lottery-picks` | 이번 주 번호를 JSON으로 미리보기 (발송 안 함) |
-| `POST /api/lottery-picks?token=…` | 월요일 알림을 지금 바로 발송 |
+| `GET /api/lottery-picks?test=1&token=…` | 테스트 메시지 발송 (기록에 저장 안 함, 브라우저로 열면 됨) |
+| `POST /api/lottery-picks?token=…` | 월요일 알림을 지금 실제로 실행 (발송 + 기록 저장) |
 | `/api/discord-interactions` | 디스코드 `/연금`, `/로또` 명령어 처리 |
 | `/api/discord-register-commands?token=…` | 명령어 등록 (처음 한 번) |
 
@@ -70,7 +71,7 @@
 
 ### 6. 확인
 - 디스코드에서 `/연금` 입력
-- 알림 바로 받아보기: `curl -X POST "https://<사이트주소>/api/lottery-picks?token=<토큰>"`
+- 알림 미리 받아보기: 브라우저로 `https://<사이트주소>/api/lottery-picks?test=1&token=<토큰>` 열기 (기록에 저장 안 함)
 
 ## 개발
 
