@@ -1,5 +1,13 @@
 import { generateLottoPicks, generatePensionPicks } from './analysis';
-import { drawInfoLine, lottoGamesBlock, pensionAllGroupsBlock, pensionOneGroupBlock, pensionScoreLine, SCORE_NOTE } from './format';
+import {
+  lottoGamesBlock,
+  ODDS_NOTE,
+  pensionAllGroupsLabels,
+  pensionBlock,
+  pensionOneGroupLabels,
+  scheduleLine,
+  SCORE_NOTE,
+} from './format';
 import { loadKnownLottoDraws, loadKnownPensionDraws, upcomingDraw } from './history';
 import { readIssued, saveIssued } from './picksStore';
 
@@ -47,13 +55,16 @@ async function pensionReply(group: number | null, now: Date): Promise<CommandRep
   return {
     embeds: [
       {
-        title: `🎫 연금복권720+ 제${target.drawNo}회 다음 순위 추천번호`,
-        description: `${drawInfoLine('pension', target.drawNo, target.date)}\n` + (group
-          ? `${group}조만 새 번호로 사고, 나머지 조는 원래 번호로 사세요.\n${pensionOneGroupBlock(group, numbers)}`
-          : `모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(numbers)}`) +
-          `\n1순위 자리별 점수: ${pensionScoreLine(numbers[0], stats.positionScores)}`,
+        title: `🎫 연금복권720+ · ${target.drawNo}회 · 다음 순위`,
+        description:
+          `${scheduleLine('pension', target.date)}\n` +
+          (group
+            ? `**${group}조만 이 번호로**, 나머지 조는 원래 번호로 사세요.\n` +
+              pensionBlock(numbers, pensionOneGroupLabels(group, numbers.length), stats.positionScores)
+            : `**모든조 5,000원** (1~5조를 같은 번호로)\n` +
+              pensionBlock(numbers, pensionAllGroupsLabels(numbers.length), stats.positionScores)),
         color: 0x22c55e,
-        footer: { text: `이번 회차에 이미 추천한 번호를 빼고 점수가 높은 순서로 골랐습니다 (역대 당첨번호 제외). ${SCORE_NOTE}` },
+        footer: { text: `이번 회차에 이미 준 번호는 빼고 점수 순으로 골랐어요.\n${SCORE_NOTE}\n${ODDS_NOTE}` },
       },
     ],
   };
@@ -71,10 +82,10 @@ async function lottoReply(now: Date): Promise<CommandReply> {
   return {
     embeds: [
       {
-        title: `🎱 로또 6/45 제${target.drawNo}회 다음 순위 추천번호`,
-        description: `${drawInfoLine('lotto', target.drawNo, target.date)}\n5게임 · 5,000원 (숫자 아래는 번호별 점수)\n${lottoGamesBlock(games, stats.scores)}`,
+        title: `🎱 로또 6/45 · ${target.drawNo}회 · 다음 순위`,
+        description: `${scheduleLine('lotto', target.date)}\n**5게임 5,000원**\n${lottoGamesBlock(games, stats.scores)}`,
         color: 0xfbbf24,
-        footer: { text: `이번 회차에 이미 추천한 게임을 빼고 점수가 높은 순서로 골랐습니다 (역대 1등 조합 제외). ${SCORE_NOTE}` },
+        footer: { text: `이번 회차에 이미 준 게임은 빼고 점수 순으로 골랐어요.\n${SCORE_NOTE}\n${ODDS_NOTE}` },
       },
     ],
   };

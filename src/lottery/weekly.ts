@@ -2,11 +2,11 @@ import { postToDiscord, type DiscordNotifyResult } from '../discord';
 import { generateLottoPicks, generatePensionPicks, type LottoPicks, type PensionPicks } from './analysis';
 import { loadLottoHistory, loadPensionHistory, upcomingDraw } from './history';
 import {
-  drawInfoLine,
   lottoGamesBlock,
-  pensionAllGroupsBlock,
-  pensionScoreLine,
-  PENSION_GROUPS,
+  ODDS_NOTE,
+  pensionAllGroupsLabels,
+  pensionBlock,
+  scheduleLine,
   SCORE_NOTE,
   SOLD_OUT_HINT,
 } from './format';
@@ -61,53 +61,46 @@ export async function buildWeeklyLottery(now = new Date()): Promise<WeeklyLotter
   const { stats: ls } = lotto;
   const { stats: ps } = pension;
 
-  const embeds = [
-    {
-      title: `🎱 로또 6/45 제${lottoTarget.drawNo}회 추천번호 (점수 1~5위)`,
-      description: `${drawInfoLine('lotto', lottoTarget.drawNo, lottoTarget.date)}\n5게임 · 5,000원 (숫자 아래는 번호별 점수)\n${lottoGamesBlock(lotto.games, ls.scores)}`,
-      color: 0xfbbf24,
-      fields: [
-        { name: '점수 TOP 6', value: ls.topScores.map((t) => `${t.number}(${t.score.toFixed(2)})`).join(' '), inline: true },
-        { name: '오래 안 나온 번호', value: ls.coldOverdue.map((c) => `${c.number}(${c.gap}회)`).join(', '), inline: true },
-        {
-          name: '적용한 조건',
-          value:
-            `합계 ${ls.sumRange[0]}~${ls.sumRange[1]} · 홀짝 2~4개 · 낮은수(1~22) 2~4개 · 3연속 번호 제외 · 역대 1등 조합 제외 · 게임 간 겹침 2개 이하\n` +
-            `(역대 1등 조합 ${ls.drawCount}개 중 ${Math.round(ls.filterPassRate * 100)}%가 이 조건 충족)`,
-        },
-      ],
-    },
-    {
-      title: `🎫 연금복권720+ 제${pensionTarget.drawNo}회 추천번호 (점수 1~3위)`,
-      description: `${drawInfoLine('pension', pensionTarget.drawNo, pensionTarget.date)}\n모든조(1~5조) · 5,000원\n${pensionAllGroupsBlock(pension.numbers)}\n${SOLD_OUT_HINT}`,
-      color: 0x22c55e,
-      fields: [
-        { name: '1순위 번호 자리별 점수', value: pensionScoreLine(pension.numbers[0], ps.positionScores) },
-        { name: '자리별 역대 최다 숫자', value: ps.topDigitByPosition.join(' '), inline: true },
-        {
-          name: '1등 조 분포',
-          value: PENSION_GROUPS.map((g) => `${g}조 ${ps.groupCounts[g]}회`).join(' · '),
-          inline: true,
-        },
-      ],
-    },
-    ...(graded.lines.length || summary
-      ? [
-          {
-            title: '📋 지난주 번호 결과',
-            description: [...graded.lines, ...(summary ? [`**누적 성적**\n${summary}`] : [])].join('\n\n'),
-            color: 0x6366f1,
-          },
-        ]
-      : []),
-    {
-      description:
-        `※ ${SCORE_NOTE}. 이번 주 점수가 가장 높은 조합이며, 명령어는 그다음 순위부터 줍니다. 추첨은 매회 독립적인 무작위라 점수로 당첨 확률이 오르지는 않습니다.` +
-        (warnings.length ? `\n⚠️ ${warnings.join('\n⚠️ ')}` : ''),
-      color: 0x9ca3af,
-      timestamp: now.toISOString(),
-    },
-  ];
+  const lottoEmbed = {
+    title: `🎱 로또 6/45 · ${lottoTarget.drawNo}회`,
+    description:
+      `${scheduleLine('lotto', lottoTarget.date)}\n` +
+      `**점수 1~5위 · 5게임 5,000원**\n${lottoGamesBlock(lotto.games, ls.scores)}`,
+    color: 0xfbbf24,
+    fields: [
+      { name: '🔥 점수 높은 번호', value: ls.topScores.map((t) => `${t.number}`).join(' · '), inline: true },
+      { name: '❄️ 오래 안 나온 번호', value: ls.coldOverdue.map((c) => `${c.number} (${c.gap}회)`).join(' · '), inline: true },
+    ],
+  };
+
+  const pensionEmbed = {
+    title: `🎫 연금복권720+ · ${pensionTarget.drawNo}회`,
+    description:
+      `${scheduleLine('pension', pensionTarget.date)}\n` +
+      `**모든조 5,000원** (1~5조를 같은 번호로)\n` +
+      `${pensionBlock(pension.numbers, pensionAllGroupsLabels(pension.numbers.length), ps.positionScores)}\n` +
+      SOLD_OUT_HINT,
+    color: 0x22c55e,
+  };
+
+  const resultEmbed =
+    graded.lines.length || summary
+      ? {
+          title: '📋 지난주 결과',
+          description: [...graded.lines, ...(summary ? [summary] : [])].join('\n\n'),
+          color: 0x6366f1,
+        }
+      : null;
+
+  // The last embed carries the footnote: how scores work and what they don't do.
+  const notes = [
+    SCORE_NOTE,
+    `조건: 합계 ${ls.sumRange[0]}~${ls.sumRange[1]} · 홀짝 2~4개 · 1~22 사이 2~4개 · 3연속 제외 · 역대 1등 조합 제외`,
+    ODDS_NOTE,
+  ].join('\n');
+  const embeds: Record<string, unknown>[] = [lottoEmbed, pensionEmbed, ...(resultEmbed ? [resultEmbed] : [])];
+  embeds[embeds.length - 1] = { ...embeds[embeds.length - 1], footer: { text: notes }, timestamp: now.toISOString() };
+  if (warnings.length) embeds.push({ description: `⚠️ ${warnings.join('\n⚠️ ')}`, color: 0xef4444 });
 
   return {
     lottoDrawNo: lottoTarget.drawNo,

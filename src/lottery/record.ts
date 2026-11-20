@@ -33,9 +33,9 @@ export function gradeLastWeek(
     const matches = games.map((g) => g.filter((n) => lottoDraw.numbers.includes(n)).length);
     const ranks = games.map((g) => lottoRank(g, lottoDraw)).filter((r): r is number => r !== null);
     lines.push(
-      `**로또 ${lottoDraw.drawNo}회** 당첨번호 ${lottoDraw.numbers.join(' ')} + ${lottoDraw.bonus}\n` +
-        `게임별 적중 ${matches.map((m, i) => `${String.fromCharCode(65 + i)}:${m}`).join(' ')} → ` +
-        (ranks.length ? `🎉 ${ranks.map((r) => `${r}등`).join(', ')} 당첨!` : '당첨 없음'),
+      `🎱 **로또 ${lottoDraw.drawNo}회** \`${lottoDraw.numbers.join(' ')}\` + 보너스 \`${lottoDraw.bonus}\`\n` +
+        `맞은 개수 ${matches.map((m, i) => `${String.fromCharCode(65 + i)} ${m}`).join(' · ')} → ` +
+        (ranks.length ? `🎉 **${ranks.map((r) => `${r}등`).join(', ')} 당첨!**` : '당첨 없음'),
     );
     // Count each draw once, even if the Monday job runs twice.
     if (!next.gradedLotto.includes(lottoDraw.drawNo)) {
@@ -56,9 +56,9 @@ export function gradeLastWeek(
       return rank ? [{ group: g, rank }] : [];
     });
     lines.push(
-      `**연금복권 ${pensionDraw.drawNo}회** 1등 ${pensionDraw.group}조 ${pensionDraw.number} · 보너스 ${pensionDraw.bonus}\n` +
-        `추천 ${number} (모든조) → ` +
-        (wins.length ? `🎉 ${wins.map((w) => `${w.group}조 ${w.rank}`).join(', ')} 당첨!` : '당첨 없음'),
+      `🎫 **연금 ${pensionDraw.drawNo}회** 1등 ${pensionDraw.group}조 \`${pensionDraw.number}\` · 보너스 \`${pensionDraw.bonus}\`\n` +
+        `추천 \`${number}\` (모든조) → ` +
+        (wins.length ? `🎉 **${wins.map((w) => `${w.group}조 ${w.rank}`).join(', ')} 당첨!**` : '당첨 없음'),
     );
     if (!next.gradedPension.includes(pensionDraw.drawNo)) {
       next.gradedPension = [...next.gradedPension, pensionDraw.drawNo];
@@ -81,15 +81,14 @@ export function recordSummary(record: PickRecord): string | null {
     const avg = record.lottoMatches / record.lottoGames;
     const ranks = rankList(record.lottoRanks, ['1', '2', '3', '4', '5']).replace(/(\d) /g, '$1등 ');
     parts.push(
-      `로또 ${record.gradedLotto.length}주 ${record.lottoGames}게임: 게임당 평균 ${avg.toFixed(2)}개 적중 (무작위 0.80)` +
-        ` · 당첨 ${ranks || '없음'} (무작위라면 게임당 5등 이상 2.4%)`,
+      `로또 ${record.gradedLotto.length}주 · 게임당 평균 **${avg.toFixed(2)}개** 맞음 (무작위 0.80) · 당첨 ${ranks || '없음'}`,
     );
   }
   if (record.pensionWeeks) {
     const ranks = rankList(record.pensionRanks, ['1등', '2등', '보너스', '3등', '4등', '5등', '6등', '7등']);
     parts.push(
-      `연금 ${record.pensionWeeks}주 중 ${record.pensionWinWeeks}주 당첨 (무작위 약 10%)` + (ranks ? ` · ${ranks}` : ''),
+      `연금 ${record.pensionWeeks}주 중 **${record.pensionWinWeeks}주** 당첨 (무작위 약 10%)` + (ranks ? ` · ${ranks}` : ''),
     );
   }
-  return parts.length ? parts.join('\n') : null;
+  return parts.length ? `📈 **누적 성적**\n${parts.join('\n')}` : null;
 }
