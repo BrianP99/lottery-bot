@@ -163,3 +163,15 @@ test('record counts each draw once and tallies results', async () => {
   assert.match(recordSummary(once.record)!, /게임당 평균 \*\*1\.50개\*\* 맞음 \(무작위 0\.80\) · 당첨 5등 1회/);
   assert.equal(recordSummary(empty), null);
 });
+
+test('a draw counts as held once its results are out', async () => {
+  const { lastHeldDraw } = await import('../src/lottery/history');
+  // 연금 342회 is drawn Thu 2026-11-19 19:05 KST.
+  assert.equal(lastHeldDraw('pension', new Date('2026-11-19T11:30:00Z')), 341); // 목 20:30
+  assert.equal(lastHeldDraw('pension', new Date('2026-11-19T12:30:00Z')), 342); // 목 21:30
+  assert.equal(lastHeldDraw('pension', new Date('2026-11-20T02:00:00Z')), 342); // 금 11:00
+  // 로또 1250회 is drawn Sat 2026-11-14 20:35 KST.
+  assert.equal(lastHeldDraw('lotto', new Date('2026-11-14T12:30:00Z')), 1249); // 토 21:30
+  assert.equal(lastHeldDraw('lotto', new Date('2026-11-14T13:30:00Z')), 1250); // 토 22:30
+  assert.equal(lastHeldDraw('lotto', new Date('2026-11-16T00:00:00Z')), 1250); // 월 09:00
+});

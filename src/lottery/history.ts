@@ -34,6 +34,18 @@ export function upcomingDraw(game: 'lotto' | 'pension', now = new Date()): { dra
   return { drawNo, date: new Date(first + (drawNo - 1) * WEEK_MS).toISOString().slice(0, 10) };
 }
 
+// Results are on the 동행복권 site by these times (KST) on draw day: 연금 is
+// drawn 19:05 Thursday, 로또 20:35 Saturday.
+const RESULTS_READY_HOUR = { lotto: 22, pension: 21 } as const;
+
+/** The latest draw whose results should be published by `now`. */
+export function lastHeldDraw(game: 'lotto' | 'pension', now = new Date()): number {
+  // Shifting by the hours left in draw day makes upcomingDraw() step past a
+  // draw exactly when its results are ready.
+  const shift = (24 - RESULTS_READY_HOUR[game]) * 60 * 60 * 1000;
+  return upcomingDraw(game, new Date(now.getTime() + shift)).drawNo - 1;
+}
+
 function mergeByDraw<T extends { drawNo: number }>(...lists: T[][]): T[] {
   const map = new Map<number, T>();
   for (const list of lists) for (const item of list) map.set(item.drawNo, item);
@@ -70,9 +82,7 @@ export interface HistoryResult<T> {
 export async function loadLottoHistory(now = new Date()): Promise<HistoryResult<LottoDraw>> {
   let draws = await loadKnownLottoDraws();
   const have = new Set(draws.map((d) => d.drawNo));
-  // Draws held before today (KST). Conservative by a day so a draw that's
-  // scheduled but not yet announced is never asked for.
-  const lastHeld = upcomingDraw('lotto', new Date(now.getTime() - DAY_MS)).drawNo - 1;
+  const lastHeld = lastHeldDraw('lotto', now);
   const wanted: number[] = [];
   for (let n = 1; n <= lastHeld; n++) if (!have.has(n)) wanted.push(n);
 
@@ -104,7 +114,7 @@ export async function loadLottoHistory(now = new Date()): Promise<HistoryResult<
 export async function loadPensionHistory(now = new Date()): Promise<HistoryResult<PensionDraw>> {
   const seed = pensionSeed as PensionDraw[];
   let draws = await loadKnownPensionDraws();
-  const lastHeld = upcomingDraw('pension', new Date(now.getTime() - DAY_MS)).drawNo - 1;
+  const lastHeld = lastHeldDraw('pension', now);
   if (draws.at(-1)!.drawNo >= lastHeld) return { draws, fetchError: null };
 
   try {

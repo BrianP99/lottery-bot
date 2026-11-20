@@ -1,6 +1,6 @@
 import { postToDiscord, type DiscordNotifyResult } from '../discord';
 import { generateLottoPicks, generatePensionPicks, type LottoPicks, type PensionPicks } from './analysis';
-import { loadLottoHistory, loadPensionHistory, upcomingDraw } from './history';
+import { lastHeldDraw, loadLottoHistory, loadPensionHistory, upcomingDraw } from './history';
 import {
   lottoGamesBlock,
   ODDS_NOTE,
@@ -48,10 +48,10 @@ export async function buildWeeklyLottery(now = new Date()): Promise<WeeklyLotter
 
   // If the history is behind, say so: the picks are still valid, but the analysis is missing recent draws.
   const warnings: string[] = [];
-  if (lottoHistory.draws.at(-1)!.drawNo < lottoTarget.drawNo - 1) {
+  if (lottoHistory.draws.at(-1)!.drawNo < lastHeldDraw('lotto', now)) {
     warnings.push(`로또 최신 회차를 못 가져와 ${lotto.stats.latestDrawNo}회까지로 분석했습니다. (${lottoHistory.fetchError ?? '데이터 없음'})`);
   }
-  if (pensionHistory.draws.at(-1)!.drawNo < pensionTarget.drawNo - 1) {
+  if (pensionHistory.draws.at(-1)!.drawNo < lastHeldDraw('pension', now)) {
     warnings.push(`연금복권 최신 회차를 못 가져와 ${pension.stats.latestDrawNo}회까지로 분석했습니다. (${pensionHistory.fetchError ?? '데이터 없음'})`);
   }
 
